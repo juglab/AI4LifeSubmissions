@@ -1,0 +1,3 @@
+aiohttp
+zarr<3.0.0
+careamics
