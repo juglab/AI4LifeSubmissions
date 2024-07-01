@@ -49,11 +49,7 @@ def main(dataset_name, batch_size=256, take_n=-1, use_n2v2=False, output_root='m
     log.info(f"Got train shape: {train.shape}")
     log.info(f"Got val shape: {val.shape}")
 
-    DATASET_NAME = 'jump_cell_painting'
-    (train, val), (train_mean, train_std), (val_mean, val_std) = load_split_datasets(DATASET_NAME)
-    print(train.shape, val.shape)
-
-    exp_name = f'{model_name}_{dataset_name}{"chwise" if independent_channels else ""}'
+    exp_name = f'{model_name}_{dataset_name}{"_chwise" if independent_channels else ""}'
 
     config = create_n2v_configuration(
                                     experiment_name=exp_name,
