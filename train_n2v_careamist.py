@@ -61,7 +61,7 @@ def main(dataset_name, batch_size=256, take_n=-1, use_n2v2=False, output_root='m
                                     axes='SCYX' if train.ndim == 4 else 'SYX',
                                     n_channels=train.shape[1] if train.ndim == 4 else 1,
                                     patch_size=(64, 64),
-                                    batch_size=128,
+                                    batch_size=batch_size,
                                     num_epochs=epochs,
                                     independent_channels=independent_channels,
                                     )
