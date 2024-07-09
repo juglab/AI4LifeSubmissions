@@ -97,6 +97,21 @@ def load_tiff(path, take_N=-1):
         dataset = dataset[:take_N]
     return dataset
 
+def iter_tiff_batch(path: str, batch_size: int):
+    """
+        Loads a TIFF file and yelds batches of size batch_size.
+        File is supposed to be in format [N, C, H, W] or [N, H, W]
+
+        Args:
+            - path: str
+            - batch_size: int
+    """
+    data = tiff.imread(path)
+    N = data.shape[0]
+    for i in range(0, N, batch_size):
+        yield data[i:i+batch_size]
+    
+
 def split_dataset(dataset_path, split_ratio=0.8, shuffle=True, take_N=-1, seed=None):
     """
     Splits a dataset into train and validation sets and saves them as TIFF files.

@@ -2,3 +2,7 @@ venv/
 .venv/
 __pycache__
 .vscode
+datasets/
+models/
+*.code-workspace
+lightning_logs/
