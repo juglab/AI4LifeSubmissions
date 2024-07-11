@@ -1,7 +1,7 @@
 import torch
-from hdn.gaussianMixtureNoiseModel import GaussianMixtureNoiseModel
-from hdn import histNoiseModel
-from hdn.utils import plotProbabilityDistribution
+from hdn.lib.gaussianMixtureNoiseModel import GaussianMixtureNoiseModel
+from hdn.lib import histNoiseModel
+from hdn.lib.utils import plotProbabilityDistribution
 from datasets import load_datasets_yml
 import tifffile
 import numpy as np
