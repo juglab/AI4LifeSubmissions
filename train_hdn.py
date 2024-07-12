@@ -50,7 +50,7 @@ def train_hdn(
     log.info(f"Setting up training of HDN for {dataset_name} using the {noise_model} noise model.")
     
     model_name = f"hdn_{noise_model}_noisemodel"
-    directory_path = os.path.join(output_root, dataset_name)
+    directory_path = os.path.join(output_root, dataset_name, 'hdn')
     log.info(f"Model name: {noise_model} \n Output path: {directory_path}")
 
     
