@@ -54,8 +54,8 @@ def cache_patches(
     val_path = get_cached_patch_path(data_basefolder, 'val', patch_size)
     test_path = get_cached_patch_path(data_basefolder, 'test', patch_size)
     all_patches = np.concatenate((train_images, val_images, test_images), axis=0)
-    patches_mean = all_patches.mean(axis=((0, 2, 3) if all_patches.ndim == 4 else None))
-    patches_var = all_patches.mean(axis=((0, 2, 3) if all_patches.ndim == 4 else None))
+    patches_mean = all_patches.mean(axis=((0, 2, 3) if all_patches.ndim == 4 else None), keepdims=True)
+    patches_var = all_patches.mean(axis=((0, 2, 3) if all_patches.ndim == 4 else None), keepdims=True)
     del all_patches
 
     log.info(f"Normalizing data...")
