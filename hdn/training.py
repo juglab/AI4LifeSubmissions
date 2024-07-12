@@ -18,7 +18,7 @@ from tifffile import imread
 from matplotlib import pyplot as plt
 from tqdm import tqdm
 
-from hdn.boilerplate.boilerplate import boilerplate
+from boilerplate import boilerplate
 from models.lvae import LadderVAE
 import lib.utils as utils
 

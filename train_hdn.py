@@ -146,6 +146,6 @@ if __name__ == "__main__":
                 output_root=args.output_root,
                 dataset_name=args.dataset_name,
                 dataset_yml=args.dataset_yml,
-                noise_model_name=args.noise_model_name,
+                noise_model=args.noise_model_name,
                 batch_size = args.batch_size
             )
