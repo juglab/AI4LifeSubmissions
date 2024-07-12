@@ -14,10 +14,64 @@ from tifffile import imread
 from matplotlib import pyplot as plt
 from tqdm import tqdm
 
-from datasets import load_split_datasets
+from datasets import load_split_datasets, load_datasets_yml
 import argparse
 import logging as log
 import os
+
+get_cached_patch_path = lambda dset_basefolder, split, patch_size: os.path.join(dset_basefolder, f"hdn_patches_{split}_{patch_size}.npy")
+
+def cache_patches(
+              dataset_name: str, 
+              dataset_yml: str, 
+              patch_size: int = 64,
+              val_data_limit: int = 1000,
+              ):
+    """
+        Store pre-computed augmentations patches into the same folder of the provided dataset for later use.
+    """
+    log.info(f"Pre-computing patches for {dataset_name} and patch size {patch_size}")
+
+    (train, val), (train_mean, train_std), (val_mean, val_std) = load_split_datasets(dataset_name, dataset_yml=dataset_yml)
+
+    log.info("Applying augmentations")
+    train = utils.augment_data(train)
+    img_width = train.shape[2]
+    img_height = train.shape[1]
+    num_patches = int(float(img_width*img_height)/float(patch_size**2)*1)
+    train_images = utils.extract_patches(train, patch_size, num_patches)
+    val_images = utils.extract_patches(val, patch_size, num_patches)
+    val_images = val_images[:val_data_limit] # We limit validation patches to 1000 to speed up training but it is not necessary
+    test_images = val_images[:100]
+    print("Shape of training images:", train_images.shape, "Shape of validation images:", val_images.shape)
+    
+    data_basefolder = os.path.dirname([d["path"] for d in load_datasets_yml(dataset_yml=dataset_yml) if d['name'] == dataset_name][0])
+    train_path = get_cached_patch_path(data_basefolder, 'train', patch_size)
+    val_path = get_cached_patch_path(data_basefolder, 'val', patch_size)
+    test_path = get_cached_patch_path(data_basefolder, 'test', patch_size)
+    
+    log.info(f"Train patches saved to {train_path}")
+    np.save(train_path, train_images)
+    log.info(f"Train patches saved to {val_path}")
+    np.save(val_path, val_images)
+    log.info(f"Train patches saved to {test_path}")
+    np.save(test_path, test_images)
+
+
+def load_cached_patches(dataset_name: str, dataset_yml: str, patch_size: int=64):
+    """
+        Load pre-computed patches
+    """
+    data_basefolder = os.path.dirname([d["path"] for d in load_datasets_yml(dataset_yml=dataset_yml) if d['name'] == dataset_name][0])
+    train_path = get_cached_patch_path(data_basefolder, 'train', patch_size)
+    val_path = get_cached_patch_path(data_basefolder, 'val', patch_size)
+    test_path = get_cached_patch_path(data_basefolder, 'test', patch_size)
+    
+    train_images = np.load(train_path)
+    val_images = np.load(val_path)
+    test_images = np.load(test_path)
+
+    return train_images, val_images, test_images
 
 
 def train_hdn(
@@ -26,7 +80,6 @@ def train_hdn(
               dataset_yml: str, 
               noise_model: str,
               patch_size: int = 64,
-              val_data_limit: int = 1000,
               batch_size: int = 64,
               ):
     
@@ -53,27 +106,17 @@ def train_hdn(
     directory_path = os.path.join(output_root, dataset_name, 'hdn')
     log.info(f"Model name: {noise_model} \n Output path: {directory_path}")
 
-    
-    
     use_cuda = torch.cuda.is_available()
     device = torch.device("cuda" if use_cuda else "cpu")
 
-
-    (train, val), (train_mean, train_std), (val_mean, val_std) = load_split_datasets(dataset_name, dataset_yml=dataset_yml)
-    log.info("Applying augmentations")
-
-    train = utils.augment_data(train)
-     
-    img_width = train.shape[2]
-    img_height = train.shape[1]
-    num_patches = int(float(img_width*img_height)/float(patch_size**2)*1)
-    train_images = utils.extract_patches(train, patch_size, num_patches)
-    val_images = utils.extract_patches(val, patch_size, num_patches)
-    val_images = val_images[:val_data_limit] # We limit validation patches to 1000 to speed up training but it is not necessary
-    test_images = val_images[:100]
-    img_shape = (train_images.shape[1], train_images.shape[2])
-    print("Shape of training images:", train_images.shape, "Shape of validation images:", val_images.shape)
-
+    try:
+        train_images, val_images, test_images = load_cached_patches(dataset_name=dataset_name, dataset_yml=dataset_yml, patch_size=patch_size)
+    except Exception as e:
+        log.error(f"Error in loaded cached patches for dataset {dataset_name}. Did you run train_hdn.py --cache_patches before?")
+        return
+        
+    img_shape = (train_images.shape[-2], train_images.shape[-1])
+  
     # Data-specific
     gaussian_noise_std = None
     noise_model_path = f"noise_models/{dataset_name}/{noise_model}/GMM.npz"
@@ -129,23 +172,33 @@ def train_hdn(
 
 
 
+
+
 if __name__ == "__main__":
     log.basicConfig()
     log.getLogger().setLevel(log.INFO)
 
-    parser = argparse.ArgumentParser(description="Generate a Noise Model from a noisy dataset and a given ground truth generated from another model, e.g., N2V/N2V2")
+    parser = argparse.ArgumentParser(description="Train an HDN model from a noisy dataset and a given ground truth generated from another model, e.g., N2V/N2V2")
     parser.add_argument('--output_root', type=str, default='models/')
+    parser.add_argument('--cache_patches', action='store_true', help="Cache the datasets patches in the dataset folder for later use. This is needed to be able to train.")
     parser.add_argument('--dataset_name', type=str, help='Name of the dataset to use as observations (the full dataset will be used).')
     parser.add_argument('--dataset_yml', type=str, help='Dataset yml descriptor', default="datasets.yml"),
     parser.add_argument('--noise_model_name', type=str, help='Name of the noise model to train HDN.')
     parser.add_argument('--batch_size', type=int, default=64, help='Batch Size')
+    parser.add_argument('--patch_size', type=int, default=64, help='Patch Size for both augmentation and model training.')
 
     args = parser.parse_args()
-
-    train_hdn(
-                output_root=args.output_root,
-                dataset_name=args.dataset_name,
-                dataset_yml=args.dataset_yml,
-                noise_model=args.noise_model_name,
-                batch_size = args.batch_size
-            )
+    if args.cache_patches:
+        cache_patches(dataset_name=args.dataset_name,
+                      dataset_yml=args.dataset_yml,
+                      patch_size=args.patch_size,
+                      val_data_limit=1000)
+    else:
+        train_hdn(
+                    output_root=args.output_root,
+                    dataset_name=args.dataset_name,
+                    dataset_yml=args.dataset_yml,
+                    noise_model=args.noise_model_name,
+                    batch_size = args.batch_size,
+                    patch_size=args.patch_size
+                )
