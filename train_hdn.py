@@ -36,8 +36,8 @@ def cache_patches(
 
     log.info("Applying augmentations")
     train = utils.augment_data(train)
-    img_width = train.shape[2]
-    img_height = train.shape[1]
+    img_width = train.shape[-1]
+    img_height = train.shape[-2]
     num_patches = int(float(img_width*img_height)/float(patch_size**2)*1)
     train_images = utils.extract_patches(train, patch_size, num_patches)
     val_images = utils.extract_patches(val, patch_size, num_patches)

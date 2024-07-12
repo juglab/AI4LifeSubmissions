@@ -130,19 +130,36 @@ def extract_patches(x,patch_size,num_patches):
     Parameters
     ----------
     x: numpy array
-        Array of images.
+        Array of images in NCHW or NHW format
     patch_size: int
-        Size of patches to be extracted from each image.
+        Size of patches to be extracted from each image. (PS)
     num_patches: int
-        Number of patches to be extracted from each image.    
+        Number of patches to be extracted from each image. (NP)  
+    Returns:
+        Patches of shape [N*NP, C, PS, PS] or [N*NP, PS, PS]
     """
-    patches = np.zeros(shape=(x.shape[0]*num_patches,patch_size,patch_size))
-    
-    for i in tqdm(range(x.shape[0])):
+    if x.ndim == 4:
+        N, C, H, W = x.shape
+    else:
+        N, H, W = x.shape
+        C = 1
+
+    patches_shape = [N*num_patches,patch_size,patch_size, C] if C > 1 else [N*num_patches,patch_size,patch_size]
+    patches = np.zeros(shape=patches_shape)
+    if x.ndim == 4:
+        # extract_patches_2d wants channel last
+        x = x.reshape([N, H, W, C])
+    print(patches.shape)
+    for i in tqdm(range(N)):
         patches[i*num_patches:(i+1)*num_patches] = image.extract_patches_2d(image=x[i],
                                                                             patch_size=(patch_size,patch_size), 
                                                                             max_patches=num_patches,
-                                                                            random_state=i)    
+                                                                            random_state=i)
+    patches = patches.squeeze()
+    if C > 1:
+        # Output patches in "NCHW" format
+        patches = patches.reshape([N*num_patches, C, patch_size, patch_size])
+    print(f"Patches shape: {patches.shape}")
     return patches
 
 
