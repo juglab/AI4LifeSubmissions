@@ -63,9 +63,15 @@ def cache_patches(
     val_images = (val_images-patches_mean)/patches_var
     test_images = (test_images-patches_mean)/patches_var
     
+
     log.info(f"Shuffling training data")
-    train_images = shuffle(train_images)
+    shuffle(train_images)
     
+
+    log.info(f"Train patches shape: {train_images}")
+    log.info(f"Val patches shape: {val_images}")  
+    log.info(f"Test patches shape: {test_images}")
+
     np.save(mean_path, patches_mean)
     log.info(f"Patches mean saved to {mean_path}")
     np.save(var_path, patches_var)
