@@ -69,14 +69,14 @@ def cache_patches(
     np.save(mean_path, patches_mean)
     log.info(f"Patches mean saved to {mean_path}")
     np.save(var_path, patches_var)
-    log.info(f"Patches mean saved to {var_path}")
+    log.info(f"Patches variance saved to {var_path}")
     
     np.save(train_path, train_images)
     log.info(f"Train patches saved to {train_path}")
     np.save(val_path, val_images)
-    log.info(f"Train patches saved to {val_path}")
+    log.info(f"Validation patches saved to {val_path}")
     np.save(test_path, test_images)
-    log.info(f"Train patches saved to {test_path}")
+    log.info(f"Testing patches saved to {test_path}")
 
 
 def load_cached_patches(dataset_name: str, dataset_yml: str, patch_size: int=64):
