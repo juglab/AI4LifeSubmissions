@@ -19,6 +19,18 @@ from tqdm import tqdm
 from models.lvae import LadderVAE
 import lib.utils as utils
 
+class HDNPatchDataset(Dataset):
+    def __init__(self, memmap_array):
+        self.memmap_array = memmap_array
+    
+    def __len__(self):
+        return self.memmap_array.shape[0]
+    
+    def __getitem__(self, idx):
+        sample = self.memmap_array[idx]
+        return torch.tensor(sample, dtype=torch.float32)
+
+
 def _make_datamanager(train_images, val_images, test_images, batch_size, test_batch_size):
     
     """Create data loaders for training, validation and test sets during training.

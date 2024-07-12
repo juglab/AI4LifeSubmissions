@@ -18,6 +18,7 @@ from datasets import load_split_datasets, load_datasets_yml
 import argparse
 import logging as log
 import os
+from numpy.random import shuffle
 
 get_cached_patch_path = lambda dset_basefolder, split, patch_size: os.path.join(dset_basefolder, f"hdn_patches_{split}_{patch_size}.npy")
 
@@ -29,6 +30,7 @@ def cache_patches(
               ):
     """
         Store pre-computed augmentations patches into the same folder of the provided dataset for later use.
+        Saved files are already normalized. Train data is already shuffled.
     """
     log.info(f"Pre-computing patches for {dataset_name} and patch size {patch_size}")
 
@@ -46,16 +48,35 @@ def cache_patches(
     print("Shape of training images:", train_images.shape, "Shape of validation images:", val_images.shape)
     
     data_basefolder = os.path.dirname([d["path"] for d in load_datasets_yml(dataset_yml=dataset_yml) if d['name'] == dataset_name][0])
+    mean_path = get_cached_patch_path(data_basefolder, 'mean', patch_size)
+    var_path = get_cached_patch_path(data_basefolder, 'var', patch_size)
     train_path = get_cached_patch_path(data_basefolder, 'train', patch_size)
     val_path = get_cached_patch_path(data_basefolder, 'val', patch_size)
     test_path = get_cached_patch_path(data_basefolder, 'test', patch_size)
+    all_patches = np.concatenate((train_images, val_images, test_images), axis=0)
+    patches_mean = all_patches.mean(axis=((0, 2, 3) if all_patches.ndim == 4 else None))
+    patches_var = all_patches.mean(axis=((0, 2, 3) if all_patches.ndim == 4 else None))
+    del all_patches
+
+    log.info(f"Normalizing data...")
+    train_images = (train_images-patches_mean)/patches_var
+    val_images = (val_images-patches_mean)/patches_var
+    test_images = (test_images-patches_mean)/patches_var
     
-    log.info(f"Train patches saved to {train_path}")
+    log.info(f"Shuffling training data")
+    train_images = shuffle(train_images)
+    
+    np.save(mean_path, patches_mean)
+    log.info(f"Patches mean saved to {mean_path}")
+    np.save(var_path, patches_var)
+    log.info(f"Patches mean saved to {var_path}")
+    
     np.save(train_path, train_images)
-    log.info(f"Train patches saved to {val_path}")
+    log.info(f"Train patches saved to {train_path}")
     np.save(val_path, val_images)
-    log.info(f"Train patches saved to {test_path}")
+    log.info(f"Train patches saved to {val_path}")
     np.save(test_path, test_images)
+    log.info(f"Train patches saved to {test_path}")
 
 
 def load_cached_patches(dataset_name: str, dataset_yml: str, patch_size: int=64):
