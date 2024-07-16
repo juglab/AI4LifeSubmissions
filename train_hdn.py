@@ -127,7 +127,13 @@ def train_hdn(
               noise_model: str,
               patch_size: int = 64,
               batch_size: int = 64,
-              memload_dataset: bool = False
+              memload_dataset: bool = False,
+              take_only: int = None,
+              virtual_batch: int = 8,
+              max_epochs: int = 500,
+              lr=3e-4,
+              steps_per_epoch = 400,
+              test_batch_size=100
               ):
     
     """
@@ -146,6 +152,8 @@ def train_hdn(
             - batch_size: int
             - memload_dataset: bool
                 Whether to load the full dataset in memory. Speeds up training if enough RAM is available. 
+            - take_only: int
+                Only use this number of training patches. Useful for debugging.
 
     """
     
@@ -165,6 +173,9 @@ def train_hdn(
                                 splits=['train', 'val', 'test'],
                                 patch_size = patch_size,
                                 )
+    if take_only:
+        log.warn(f"Taking only {take_only} samples for training!")
+        train_images = train_images[:take_only]
     data_mean = torch.from_numpy(data_mean).to(device)
     data_std = np.sqrt(data_var)
     data_std = torch.from_numpy(data_std).to(device)
@@ -184,12 +195,7 @@ def train_hdn(
     noiseModel = GaussianMixtureNoiseModel(params = noise_model_params, device = device)
 
     # Training-specific
-    batch_size=64
-    virtual_batch = 8
-    lr=3e-4
-    max_epochs = 500
-    steps_per_epoch = 400
-    test_batch_size=100
+
 
     # Model-specific
     num_latents = 6
@@ -244,6 +250,15 @@ if __name__ == "__main__":
     parser.add_argument('--batch_size', type=int, default=64, help='Batch Size')
     parser.add_argument('--patch_size', type=int, default=64, help='Patch Size for both augmentation and model training.')
     parser.add_argument('--memload_dataset', action='store_true', help='Whether to load the full dataset in memory. If not specified, a memory mapped array will be used')
+    parser.add_argument('--take_only', type=int, default=None, help='Only uses the given number of patches. Useful for debugging purposes.')
+    parser.add_argument('--virtual_batch', type=int, default=8, help='Virtual Batch Size.')
+    parser.add_argument('--max_epochs', type=int, default=500, help="Max epochs")
+    parser.add_argument('--lr', type=float, default=3e-4, help='Learning rate')
+    parser.add_argument('--steps_per_epoch', type=int, default=400, help="Steps per Epoch")
+    parser.add_argument('--test_batch_size', type=int, default=100, help='Test Batch Size')
+
+
+
 
     args = parser.parse_args()
     if args.cache_patches:
@@ -259,5 +274,11 @@ if __name__ == "__main__":
                     noise_model=args.noise_model_name,
                     batch_size = args.batch_size,
                     patch_size=args.patch_size,
-                    memload_dataset=args.memload_dataset
+                    memload_dataset=args.memload_dataset,
+                    take_only=args.take_only,
+                    virtual_batch=args.virtual_batch,
+                    max_epochs=args.max_epochs,
+                    lr=args.lr,
+                    steps_per_epoch=args.steps_per_epoch,
+                    test_batch_size=args.test_batch_size
                 )
