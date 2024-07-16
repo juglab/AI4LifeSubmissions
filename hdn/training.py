@@ -94,7 +94,7 @@ def train_network(model, lr, max_epochs,steps_per_epoch,train_loader, val_loader
         running_reconstruction_loss = []
         running_kl_loss = []
         
-        for batch_idx, (x, y) in enumerate(train_loader):
+        for batch_idx, (x, y) in enumerate(tqdm(train_loader)):
             step_counter=batch_idx
             x = x.unsqueeze(1) # Remove for RGB
             x = x.to(device=device, dtype=torch.float)

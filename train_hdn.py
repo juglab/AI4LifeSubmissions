@@ -19,8 +19,13 @@ import argparse
 import logging as log
 import os
 from numpy.random import shuffle
+import yaml
+from hdn.boilerplate.boilerplate import HDNPatchCachedDataset
+from torch.utils.data import DataLoader
 
 get_cached_patch_path = lambda dset_basefolder, split, patch_size: os.path.join(dset_basefolder, f"hdn_patches_{split}_{patch_size}.npy")
+get_cached_patch_shape_path = lambda dset_basefolder, patch_size: get_cached_patch_path(dset_basefolder, 'shapes', patch_size).replace('.npy', '.yml')
+get_dataset_basefolder = lambda dataset_name, dataset_yml='dataset.yml': os.path.dirname([d["path"] for d in load_datasets_yml(dataset_yml=dataset_yml) if d['name'] == dataset_name][0])
 
 def cache_patches(
               dataset_name: str, 
@@ -47,7 +52,7 @@ def cache_patches(
     test_images = val_images[:100]
     print("Shape of training images:", train_images.shape, "Shape of validation images:", val_images.shape)
     
-    data_basefolder = os.path.dirname([d["path"] for d in load_datasets_yml(dataset_yml=dataset_yml) if d['name'] == dataset_name][0])
+    data_basefolder = get_dataset_basefolder(dataset_name=dataset_name, dataset_yml=dataset_yml)
     mean_path = get_cached_patch_path(data_basefolder, 'mean', patch_size)
     var_path = get_cached_patch_path(data_basefolder, 'var', patch_size)
     train_path = get_cached_patch_path(data_basefolder, 'train', patch_size)
@@ -68,9 +73,9 @@ def cache_patches(
     shuffle(train_images)
     
 
-    log.info(f"Train patches shape: {train_images}")
-    log.info(f"Val patches shape: {val_images}")  
-    log.info(f"Test patches shape: {test_images}")
+    log.info(f"Train patches shape: {train_images.shape}")
+    log.info(f"Val patches shape: {val_images.shape}")  
+    log.info(f"Test patches shape: {test_images.shape}")
 
     np.save(mean_path, patches_mean)
     log.info(f"Patches mean saved to {mean_path}")
@@ -85,20 +90,34 @@ def cache_patches(
     log.info(f"Testing patches saved to {test_path}")
 
 
-def load_cached_patches(dataset_name: str, dataset_yml: str, patch_size: int=64):
+def load_cached_patches(dataset_name: str, dataset_yml: str, memmapped=False, splits: list[str]=["train", "val", "test"], patch_size: int=64):
     """
-        Load pre-computed patches
+        Load pre-computed patches.
+        
+        Returns:
+            - tuple: memmapped arrays corresponding to the ones specified in "splits"
+            - channelwise mean of the dataset
+            - channelwise variance of the dataset
     """
-    data_basefolder = os.path.dirname([d["path"] for d in load_datasets_yml(dataset_yml=dataset_yml) if d['name'] == dataset_name][0])
-    train_path = get_cached_patch_path(data_basefolder, 'train', patch_size)
-    val_path = get_cached_patch_path(data_basefolder, 'val', patch_size)
-    test_path = get_cached_patch_path(data_basefolder, 'test', patch_size)
+    data_basefolder = get_dataset_basefolder(dataset_name=dataset_name, dataset_yml=dataset_yml)
+    paths = (get_cached_patch_path(data_basefolder, s, patch_size) for s in splits)
     
-    train_images = np.load(train_path)
-    val_images = np.load(val_path)
-    test_images = np.load(test_path)
+    images = (np.load(p, 
+                        mmap_mode='r' if memmapped else None
+                        )
+                for p in paths)
 
-    return train_images, val_images, test_images
+
+
+    # Load Statistics
+    mean_path = get_cached_patch_path(data_basefolder, 'mean', patch_size=patch_size)
+    var_path = get_cached_patch_path(data_basefolder, 'var', patch_size=patch_size)
+
+    return images, np.load(mean_path), np.load(var_path)
+
+
+
+
 
 
 def train_hdn(
@@ -108,6 +127,7 @@ def train_hdn(
               noise_model: str,
               patch_size: int = 64,
               batch_size: int = 64,
+              memload_dataset: bool = False
               ):
     
     """
@@ -124,6 +144,8 @@ def train_hdn(
             - val_data_limit: int (Default: 1000)
                 Limit validation data samples to speedup training.
             - batch_size: int
+            - memload_dataset: bool
+                Whether to load the full dataset in memory. Speeds up training if enough RAM is available. 
 
     """
     
@@ -136,11 +158,21 @@ def train_hdn(
     use_cuda = torch.cuda.is_available()
     device = torch.device("cuda" if use_cuda else "cpu")
 
-    try:
-        train_images, val_images, test_images = load_cached_patches(dataset_name=dataset_name, dataset_yml=dataset_yml, patch_size=patch_size)
-    except Exception as e:
-        log.error(f"Error in loaded cached patches for dataset {dataset_name}. Did you run train_hdn.py --cache_patches before?")
-        return
+    #try:
+    (train_images, val_images, test_images), data_mean, data_var = load_cached_patches(dataset_name=dataset_name,
+                                dataset_yml=dataset_yml,
+                                memmapped=not memload_dataset,
+                                splits=['train', 'val', 'test'],
+                                patch_size = patch_size,
+                                )
+    data_mean = torch.from_numpy(data_mean).to(device)
+    data_std = np.sqrt(data_var)
+    data_std = torch.from_numpy(data_std).to(device)
+
+
+    #except Exception as e:
+    #    log.error(f"Error in loaded cached patches for dataset {dataset_name}. Did you run train_hdn.py --cache_patches before?")
+    #    return
         
     img_shape = (train_images.shape[-2], train_images.shape[-1])
   
@@ -167,9 +199,10 @@ def train_hdn(
     free_bits = 1.0
     use_uncond_mode_at=[0,1]
 
-    train_loader, val_loader, test_loader, data_mean, data_std = boilerplate._make_datamanager(train_images,val_images,
-                                                                                           test_images,batch_size,
-                                                                                           test_batch_size)
+    train_loader = DataLoader(HDNPatchCachedDataset(train_images), batch_size=batch_size, shuffle=False)
+    val_loader = DataLoader(HDNPatchCachedDataset(val_images), batch_size=batch_size, shuffle=False)
+    test_loader = DataLoader(HDNPatchCachedDataset(test_images), batch_size=test_batch_size, shuffle=False)
+
 
     model = LadderVAE(z_dims=z_dims,
                     blocks_per_layer=blocks_per_layer,
@@ -198,9 +231,6 @@ def train_hdn(
                             val_loss_patience=30)
 
 
-
-
-
 if __name__ == "__main__":
     log.basicConfig()
     log.getLogger().setLevel(log.INFO)
@@ -213,6 +243,7 @@ if __name__ == "__main__":
     parser.add_argument('--noise_model_name', type=str, help='Name of the noise model to train HDN.')
     parser.add_argument('--batch_size', type=int, default=64, help='Batch Size')
     parser.add_argument('--patch_size', type=int, default=64, help='Patch Size for both augmentation and model training.')
+    parser.add_argument('--memload_dataset', action='store_true', help='Whether to load the full dataset in memory. If not specified, a memory mapped array will be used')
 
     args = parser.parse_args()
     if args.cache_patches:
@@ -227,5 +258,6 @@ if __name__ == "__main__":
                     dataset_yml=args.dataset_yml,
                     noise_model=args.noise_model_name,
                     batch_size = args.batch_size,
-                    patch_size=args.patch_size
+                    patch_size=args.patch_size,
+                    memload_dataset=args.memload_dataset
                 )

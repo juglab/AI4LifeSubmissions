@@ -16,70 +16,21 @@ from tifffile import imread
 from matplotlib import pyplot as plt
 from tqdm import tqdm
 
-from models.lvae import LadderVAE
-import lib.utils as utils
+class HDNPatchCachedDataset(Dataset):
 
-class HDNPatchDataset(Dataset):
-    def __init__(self, memmap_array):
-        self.memmap_array = memmap_array
-    
     def __len__(self):
-        return self.memmap_array.shape[0]
+        return self.mmap_samples.shape[0]
     
     def __getitem__(self, idx):
-        sample = self.memmap_array[idx]
-        return torch.tensor(sample, dtype=torch.float32)
+        sample = self.mmap_samples[idx]
+        return torch.tensor(sample, dtype=torch.float32), torch.zeros(sample.shape)
 
-
-def _make_datamanager(train_images, val_images, test_images, batch_size, test_batch_size):
-    
-    """Create data loaders for training, validation and test sets during training.
-    The test set will simply be used for plotting and comparing generated images 
-    from the learned denoised posterior during training phase. 
-    No evaluation will be done on the test set during training. 
-    Args:
-        train_images (np array): A 3d array
-        val_images (np array): A 3d array
-        test_images (np array): A 3d array
-        batch_size (int): The batch size for training and validation steps
-        test_batch_size (int): The batch size for test steps
-    Returns:
-        train_loader: Training data loader
-        val_loader: Validation data loader
-        test_loader: Test data loader
-        data_mean: mean of train data and validation data combined
-        data_std: std of train data and validation data combined
-    """
-    
-    np.random.shuffle(train_images)
-    train_images = train_images
-    np.random.shuffle(val_images)
-    val_images = val_images
-    
-    combined_data = np.concatenate((train_images, val_images), axis=0)
-    data_mean = np.mean(combined_data)
-    data_std = np.std(combined_data)
-    train_images = (train_images-data_mean)/data_std
-    train_images = torch.from_numpy(train_images)
-    train_labels = torch.zeros(len(train_images),).fill_(float('nan'))
-    train_set = TensorDataset(train_images, train_labels)
-    
-    val_images = (val_images-data_mean)/data_std
-    val_images = torch.from_numpy(val_images)
-    val_labels = torch.zeros(len(val_images),).fill_(float('nan'))
-    val_set = TensorDataset(val_images, val_labels)
-    
-    np.random.shuffle(test_images)
-    test_images = torch.from_numpy(test_images)
-    test_images = (test_images-data_mean)/data_std
-    test_labels = torch.zeros(len(test_images),).fill_(float('nan'))
-    test_set = TensorDataset(test_images, test_labels)
-    
-    train_loader = DataLoader(train_set, batch_size=batch_size, shuffle=True)
-    val_loader = DataLoader(val_set, batch_size=batch_size, shuffle=True)
-    test_loader = DataLoader(test_set, batch_size=test_batch_size, shuffle=True)
-    
-    return train_loader, val_loader, test_loader, data_mean, data_std
+    def __init__(self, mmap_samples) -> None:
+        """
+            An HDN cached dataset, requiring a .npy file and the corresponding .yml file to load the data shape.
+            Can be built by running train_hdn.py using the --cache_patches flag.
+        """
+        self.mmap_samples = mmap_samples
     
 def _make_optimizer_and_scheduler(model, lr, weight_decay) -> Optimizer:
     """
