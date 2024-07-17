@@ -210,7 +210,8 @@ def save_images(img_folder, device, model,  test_loader, gaussian_noise_std, dat
 
     # Get first test batch
     (x, _) = next(iter(test_loader))
-    x = x.unsqueeze(1)
+    if x.ndim == 3:
+        x = x.unsqueeze(1)
     x = x.to(device=device, dtype=torch.float)
     # Save model original/reconstructions
     fname = os.path.join(img_folder, 'reconstruction_' + str(step) + '.png')

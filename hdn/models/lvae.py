@@ -49,8 +49,8 @@ class LadderVAE(nn.Module):
         self.res_block_type = res_block_type
         self.gated = gated
         self.device = device
-        self.data_mean = torch.Tensor([data_mean]).to(self.device)
-        self.data_std = torch.Tensor([data_std]).to(self.device)
+        self.data_mean = torch.Tensor([data_mean]).to(self.device) if not isinstance(data_mean, torch.Tensor) else data_mean
+        self.data_std = torch.Tensor([data_std]).to(self.device) if not isinstance(data_std, torch.Tensor) else data_std
         self.noiseModel = noiseModel
         self.mode_pred=mode_pred
         self.use_uncond_mode_at=use_uncond_mode_at

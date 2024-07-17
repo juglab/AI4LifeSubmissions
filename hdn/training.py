@@ -97,7 +97,8 @@ def train_network(model, lr, max_epochs,steps_per_epoch,train_loader, val_loader
             
             for batch_idx, (x, y) in enumerate(tqdm(train_loader)):
                 step_counter=batch_idx
-                x = x.unsqueeze(1) # Remove for RGB
+                if x.ndim == 3:
+                    x = x.unsqueeze(1) # Remove for RGB
                 x = x.to(device=device, dtype=torch.float)
                 step = model.global_step
                 
