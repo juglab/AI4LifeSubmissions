@@ -22,7 +22,7 @@ def generate_predictions(output_root:str, model_ckpt: str, model_name: str, data
         print(f"Predicting batch of shape {data_batch.shape}")
         pred_batch = model.predict(source=data_batch, data_type='array', axes='SCYX' if data_batch.ndim == 4 else 'SYX')
         predictions.append(pred_batch)
-    predictions = np.concatenate(predictions, axis=0)
+    predictions = np.concatenate(predictions, axis=0).squeeze()
     print(f"Saving predictions of shape {predictions.shape}")
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     tifffile.imwrite(output_path, predictions)
