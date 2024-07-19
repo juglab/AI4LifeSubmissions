@@ -2,7 +2,7 @@
 torch
 torchvision
 torchaudio
-careamics==0.1.0rc6
+careamics==0.1.0rc8
 aiohttp
 zarr<3.0.0
 tiffile

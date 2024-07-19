@@ -5,11 +5,8 @@ import numpy as np
 from pytorch_lightning import LightningModule, Trainer
 from pytorch_lightning.callbacks import ModelCheckpoint, Callback
 
-from careamics import CAREamicsModuleWrapper
 from careamics import CAREamist
 from careamics.utils.metrics import psnr
-from careamics.lightning_datamodule import TrainingDataWrapper
-from careamics.lightning_prediction_loop import CAREamicsPredictionLoop
 from careamics.config import create_n2v_configuration
 
 from datasets import load_split_datasets
@@ -18,7 +15,7 @@ import os
 # CPU COUNT
 log.basicConfig(level=log.INFO)
 
-def main(dataset_name, batch_size=256, take_n=-1, use_n2v2=False, output_root='models/', epochs=1000, independent_channels=True):
+def main(dataset_name, batch_size=256, take_n=-1, use_n2v2=False, output_root='models/', epochs=1000, independent_channels=True, noflip=False, norot=0):
     """
     Train a Noise2Void model on the given dataset.
 
@@ -62,6 +59,11 @@ def main(dataset_name, batch_size=256, take_n=-1, use_n2v2=False, output_root='m
                                     independent_channels=independent_channels,
                                     )
 
+    if noflip:
+        config.data_config.transforms[0].flip_y = False  # do not flip y
+    if norot:
+        config.data_config.transforms.pop(1)  # remove 90 degree rotations
+
     careamist = CAREamist(source=config, work_dir=os.path.join(output_root, exp_name))
 
     # train model
@@ -77,6 +79,9 @@ if __name__ == "__main__":
     argparser.add_argument('--output_dir', type=str, default='models/', help='Output ROOT directory for the model.') 
     argparser.add_argument('--epochs', type=int, default=1000, help='Number of epochs to train the model.')
     argparser.add_argument('--joint_channels', action='store_true', help='Use joint channels. Default is independent channels.')
+    argparser.add_argument('--noflip', action='store_true', help="Do not flip the images")
+    argparser.add_argument('--norot', action='store_true', help="Do not 90-rotate the images")
+    
     args = argparser.parse_args()
 
-    main(args.dataset_name, args.batch_size, args.take_n, args.use_n2v2, output_root=args.output_dir, epochs=args.epochs, independent_channels=not args.joint_channels)
+    main(args.dataset_name, args.batch_size, args.take_n, args.use_n2v2, output_root=args.output_dir, epochs=args.epochs, independent_channels=not args.joint_channels, noflip=args.noflip, norot=args.norot)
