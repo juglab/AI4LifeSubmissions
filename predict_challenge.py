@@ -9,8 +9,7 @@ import glob
 
 
 def predict_n2v(input_path:str, model_ckpt:str, batch_size: str):
-    all_files = glob.glob(os.path.join(input_path, '*.tiff'))
-
+    all_files = glob.glob(os.path.join(input_path, '*.tif*'))
     model = CAREamist(model_ckpt, work_dir=os.path.dirname(os.path.dirname(model_ckpt)))
 
     for tiff_in_path in all_files:

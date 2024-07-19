@@ -7,3 +7,4 @@ aiohttp
 zarr<3.0.0
 tiffile
 scikit-learn
+matplotlib
