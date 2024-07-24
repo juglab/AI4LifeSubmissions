@@ -37,11 +37,10 @@ def predict_n2v(input_path:str, model_ckpt:str, batch_size: str):
         pred_batch = list()
         print(f"Predicting one frame at a time to avoid OOMs...")
         for img in tiff_input:
-            if img.ndim == 2:
+            if img.ndim == 2 or img.ndim == 3:
                 img = img[None, ...]
             print(f"Img Shape: {img.shape}")
-            new_pred_batch = model.predict(source=img, data_type='array', axes='SCYX' if img.ndim == 4 else 'SYX')
-            pred_batch.append(new_pred_batch)
+            pred_batch += model.predict(source=img, data_type='array', axes='SCYX' if img.ndim == 4 else 'SYX')
         pred_batch = np.concatenate(pred_batch, axis=0)
         print(f"Final Prediction Shape: {pred_batch.shape}")
         os.makedirs(os.path.dirname(tiff_out_path), exist_ok=True)
