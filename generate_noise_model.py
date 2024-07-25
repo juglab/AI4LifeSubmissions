@@ -10,10 +10,40 @@ import os
 import argparse
 import logging as log
 
+import matplotlib.pyplot as plt
+import matplotlib.animation as animation
+from PIL import Image
+
 log.basicConfig()
 log.getLogger().setLevel(log.INFO)
 
-
+def plotProbabilityDistribution(ax1, ax2, signalBinIndex, histogram, gaussianMixtureNoiseModel, min_signal, max_signal, n_bin, device):
+    """Plots probability distribution P(x|s) for a certain ground truth signal."""
+    histBinSize = (max_signal - min_signal) / n_bin
+    querySignal_numpy = (signalBinIndex / float(n_bin) * (max_signal - min_signal) + min_signal)
+    querySignal_numpy += histBinSize / 2
+    querySignal_torch = torch.from_numpy(np.array(querySignal_numpy)).float().to(device)
+    
+    queryObservations_numpy = np.arange(min_signal, max_signal, histBinSize)
+    queryObservations_numpy += histBinSize / 2
+    queryObservations = torch.from_numpy(queryObservations_numpy).float().to(device)
+    pTorch = gaussianMixtureNoiseModel.likelihood(queryObservations, querySignal_torch)
+    pNumpy = pTorch.cpu().detach().numpy()
+    
+    ax1.clear()
+    ax2.clear()
+    
+    ax1.set_xlabel('Observation Bin')
+    ax1.set_ylabel('Signal Bin')
+    ax1.imshow(histogram**0.25, cmap='gray')
+    ax1.axhline(y=signalBinIndex + 0.5, linewidth=5, color='blue', alpha=0.5)
+    
+    ax2.plot(queryObservations_numpy, histogram[signalBinIndex, :] / histBinSize, label='GT Hist: bin =' + str(signalBinIndex), color='blue', linewidth=2)
+    ax2.plot(queryObservations_numpy, pNumpy, label='GMM : ' + ' signal = ' + str(np.round(querySignal_numpy, 2)), color='red', linewidth=2)
+    ax2.set_xlabel('Observations (x) for signal s = ' + str(querySignal_numpy))
+    ax2.set_ylabel('Probability Density')
+    ax2.set_title("Probability Distribution P(x|s) at signal =" + str(querySignal_numpy))
+    ax2.legend()
 
 def generate_noise_model(
                             output_root:str, 
@@ -62,12 +92,28 @@ def generate_noise_model(
         gaussianMixtureNoiseModel = GaussianMixtureNoiseModel(min_signal = min_signal, max_signal = max_signal, path=out_root+'/', weight = None, n_gaussian = n_gaussian, n_coeff = n_coeff, device = device, min_sigma = 50)
         gaussianMixtureNoiseModel.train(signal, observations, batchSize = 250000, n_epochs = epochs, learning_rate = 0.1, name = 'GMM', lowerClip = 0.5, upperClip = 99.5)
         log.info(f"Model saved Successfully")
-        plotProbabilityDistribution(signalBinIndex=signal_bin_index, histogram=histogramFD, gaussianMixtureNoiseModel=gaussianMixtureNoiseModel, min_signal=datamin, max_signal=datamax, n_bin= bins, device=device)
-        plt.savefig(os.path.join(out_root, 'GMM.png'))
-        log.info("Figure saved to " + os.path.join(out_root, 'GMM.png'))
-
+    
+    
     except Exception as e:
         log.error(f"ERROR PROCESSING DATASET {dataset_name} and model {gt_name}: {str(e)}")
+
+
+
+    # Initialize figure and axes
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
+
+    # Animation function
+    def animate(i):
+        plotProbabilityDistribution(ax1, ax2, signalBinIndex=i, histogram=histogramFD, gaussianMixtureNoiseModel=gaussianMixtureNoiseModel, min_signal=datamin, max_signal=datamax, n_bin=bins, device=device)
+        return ax1, ax2
+
+    # Create the animation
+    ani = animation.FuncAnimation(fig, animate, frames=bins, interval=200, blit=False)
+
+    # Save the animation as a GIF
+    ani.save(os.path.join(out_root, 'animation.gif'), writer='pillow')
+
+    print(f"Created Noise Model for {gt_name} {dataset_name} at {out_root}")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Generate a Noise Model from a noisy dataset and a given ground truth generated from another model, e.g., N2V/N2V2")
