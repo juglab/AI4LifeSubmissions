@@ -106,7 +106,6 @@ def train_network(model, lr, max_epochs,steps_per_epoch,train_loader, val_loader
                     if step % test_log_every == 0       :
                     
                         print("Testing the model at " "step {}". format(step))
-
                         with torch.no_grad():
                             boilerplate._test(epoch, img_folder, device, model,
                                             test_loader, gaussian_noise_std,
@@ -114,7 +113,6 @@ def train_network(model, lr, max_epochs,steps_per_epoch,train_loader, val_loader
                             model.train()
                 
                 optimizer.zero_grad()
-            
             
                 ### Make smaller batches
                 virtual_batches = torch.split(x,virtual_batch,0)

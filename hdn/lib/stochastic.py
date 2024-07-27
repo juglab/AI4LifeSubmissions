@@ -45,13 +45,14 @@ class NormalStochasticBlock2d(nn.Module):
 
         # Define p(z)
         p_mu, p_lv = p_params.chunk(2, dim=1)
-        p = Normal(p_mu, (p_lv / 2).exp())
+        p = Normal(p_mu, 1e-10+(p_lv / 2).exp())
 
         if q_params is not None:
             # Define q(z)
             q_params = self.conv_in_q(q_params)
             q_mu, q_lv = q_params.chunk(2, dim=1)
-            q = Normal(q_mu, (q_lv / 2).exp())
+            q_lv = torch.clip(q_lv, max=20)
+            q = Normal(q_mu, 1e-10 + (q_lv / 2).exp())
 
             # Sample from q(z)
             sampling_distrib = q
@@ -143,8 +144,10 @@ def kl_normal_mc(z, p_mulv, q_mulv):
     """
     p_mu, p_lv = torch.chunk(p_mulv, 2, dim=1)
     q_mu, q_lv = torch.chunk(q_mulv, 2, dim=1)
-    p_std = (p_lv / 2).exp()
-    q_std = (q_lv / 2).exp()
+    q_lv = torch.clip(q_lv, max=20)
+    p_lv = torch.clip(p_lv, max=20)
+    p_std = 1e-10+(p_lv / 2).exp()
+    q_std = 1e-10+(q_lv / 2).exp()
     p_distrib = Normal(p_mu, p_std)
     q_distrib = Normal(q_mu, q_std)
     return q_distrib.log_prob(z) - p_distrib.log_prob(z)
