@@ -66,22 +66,22 @@ def generate_noise_model(
     gt_path = gt_path or f'predictions/{dataset_name}/{gt_name}.tiff'
     
     log.info(f"Loading signals...")
-    observations = tifffile.imread(dset['path'])
+    full_observations = tifffile.imread(dset['path'])
+    full_signal = tifffile.imread(gt_path).squeeze()
     
     
-    channels = range(signal.shape[1]) if signal.ndim == 4 else [0]
+    channels = range(full_signal.shape[1]) if full_signal.ndim == 4 else [0]
 
     for channel in channels: 
         
-        assert (channel is None and signal.ndim == 3) or (channel is not None and signal.ndim == 4), "If image is multichannel then select a channel, otherwise set channel to None."
+        # assert (channel is None and full_signal.ndim == 3) or (channel is not None and full_signal.ndim == 4), "If image is multichannel then select a channel, otherwise set channel to None."
         if channel is not None:
             print(f"Selecting channel {channel}")
-            observations = observations[:, channel, ...]
-            signal = signal[:, channel, ...]
+            observations = full_observations[:, channel, ...]
+            signal = full_signal[:, channel, ...]
         
         out_root = os.path.join('noise_models', dataset_name, gt_name, f'channel_{channel if channel is not None else 0}')
         datamin, datamax = observations.min(), observations.max()
-        signal = tifffile.imread(gt_path).squeeze()
         log.info(f"Done.")
 
         try:
