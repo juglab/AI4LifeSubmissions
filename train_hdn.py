@@ -133,7 +133,8 @@ def train_hdn(
               max_epochs: int = 500,
               lr=3e-4,
               steps_per_epoch = 400,
-              test_batch_size=100
+              test_batch_size=100,
+              channel: int = 0,
               ):
     
     """
@@ -160,7 +161,7 @@ def train_hdn(
     log.info(f"Setting up training of HDN for {dataset_name} using the {noise_model} noise model.")
     
     model_name = f"hdn_{noise_model}_noisemodel"
-    directory_path = os.path.join(output_root, dataset_name, 'hdn')
+    directory_path = os.path.join(output_root, dataset_name, 'hdn', f'channel_{channel}')
     log.info(f"Model name: {noise_model} \n Output path: {directory_path}")
 
     use_cuda = torch.cuda.is_available()
@@ -173,27 +174,32 @@ def train_hdn(
                                 splits=['train', 'val', 'test'],
                                 patch_size = patch_size,
                                 )
+    if train_images.ndim == 3:
+        print(f"Dataset is single-channel")
+    elif train_images.ndim == 4:
+        print(f"Dataset is multi-channel, taking channel {channel}")
+        train_images = train_images[:, channel, ...]  
+        val_images = val_images[:, channel, ...] 
+        test_images = test_images[:, channel, ...]
+        data_mean = data_mean[:, channel, ...]
+        data_var = data_var[:, channel, ...]
+
     if take_only:
         log.warn(f"Taking only {take_only} samples for training!")
         train_images = train_images[:take_only]
+        
     data_mean = torch.from_numpy(data_mean).to(device)
     data_std = np.sqrt(data_var)
     data_std = torch.from_numpy(data_std).to(device)
-
-
-    #except Exception as e:
-    #    log.error(f"Error in loaded cached patches for dataset {dataset_name}. Did you run train_hdn.py --cache_patches before?")
-    #    return
         
     img_shape = (train_images.shape[-2], train_images.shape[-1])
   
     # Data-specific
     gaussian_noise_std = None
-    noise_model_path = f"noise_models/{dataset_name}/{noise_model}/GMM.npz"
+    noise_model_path = f"noise_models/{dataset_name}/{noise_model}/channel_{channel}/GMM.npz"
     log.info(f"Loading noise model from {noise_model_path}")
     noise_model_params= np.load(noise_model_path)
     noiseModel = GaussianMixtureNoiseModel(params = noise_model_params, device = device)
-
     # Training-specific
 
 
@@ -256,6 +262,7 @@ if __name__ == "__main__":
     parser.add_argument('--lr', type=float, default=3e-4, help='Learning rate')
     parser.add_argument('--steps_per_epoch', type=int, default=400, help="Steps per Epoch")
     parser.add_argument('--test_batch_size', type=int, default=100, help='Test Batch Size')
+    parser.add_argument('--channel', type=int, default=0, help="Which channel to train HDN on. Defaults to 0.")
 
 
 
@@ -280,5 +287,6 @@ if __name__ == "__main__":
                     max_epochs=args.max_epochs,
                     lr=args.lr,
                     steps_per_epoch=args.steps_per_epoch,
-                    test_batch_size=args.test_batch_size
+                    test_batch_size=args.test_batch_size,
+                    channel=args.channel,
                 )
