@@ -105,28 +105,29 @@ def generate_noise_model(
             gaussianMixtureNoiseModel = GaussianMixtureNoiseModel(min_signal = min_signal, max_signal = max_signal, path=out_root+'/', weight = None, n_gaussian = n_gaussian, n_coeff = n_coeff, device = device, min_sigma = 50)
             gaussianMixtureNoiseModel.train(signal, observations, batchSize = 250000, n_epochs = epochs, learning_rate = 0.1, name = 'GMM', lowerClip = 0.5, upperClip = 99.5)
             log.info(f"Model saved Successfully")
-        
+            print(f"Created Noise Model for {gt_name} {dataset_name} at {out_root}")
         
         except Exception as e:
             log.error(f"ERROR PROCESSING DATASET {dataset_name} and model {gt_name}: {str(e)}")
 
 
+        try:
+            # Initialize figure and axes
+            fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
 
-        # Initialize figure and axes
-        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
+            # Animation function
+            def animate(i):
+                plotProbabilityDistribution(ax1, ax2, signalBinIndex=i, histogram=histogramFD, gaussianMixtureNoiseModel=gaussianMixtureNoiseModel, min_signal=datamin, max_signal=datamax, n_bin=bins, device=device)
+                return ax1, ax2
 
-        # Animation function
-        def animate(i):
-            plotProbabilityDistribution(ax1, ax2, signalBinIndex=i, histogram=histogramFD, gaussianMixtureNoiseModel=gaussianMixtureNoiseModel, min_signal=datamin, max_signal=datamax, n_bin=bins, device=device)
-            return ax1, ax2
+            # Create the animation
+            ani = animation.FuncAnimation(fig, animate, frames=bins, interval=200, blit=False)
 
-        # Create the animation
-        ani = animation.FuncAnimation(fig, animate, frames=bins, interval=200, blit=False)
-
-        # Save the animation as a GIF
-        ani.save(os.path.join(out_root, 'animation.gif'), writer='pillow')
-
-        print(f"Created Noise Model for {gt_name} {dataset_name} at {out_root}")
+            # Save the animation as a GIF
+            ani.save(os.path.join(out_root, 'animation.gif'), writer='pillow')
+            
+        except Exception as e:
+            log.error(f"Failed to write animation gif: {str(e)}")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Generate a Noise Model from a noisy dataset and a given ground truth generated from another model, e.g., N2V/N2V2")
