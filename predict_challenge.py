@@ -122,8 +122,6 @@ def predict_hdn(input_path:str, model_ckpt:str, batch_size: str, use_tta=False, 
             tiff_input = tiff_input[:, None, ...]
         # Fix the number of dimensions
         # Iterate over channels
-        tiff_input = tiff_input[:, :, 64:128, 64:128]
-        print("TRIMMING THE INPUT FOR DEBUGGING!!!!!")
         N,C,H,W = tiff_input.shape
 
         models = []
