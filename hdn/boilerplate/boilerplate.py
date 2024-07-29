@@ -290,7 +290,7 @@ def predict_mmse(img_n, num_samples, model, gaussian_noise_std, device, return_s
         std of Gaussian noise used to corrupty data. For intrinsically noisy data, set to None.
     device: GPU device
     """
-    img_height,img_width=img_n.shape[0],img_n.shape[1]
+    img_height,img_width=img_n.shape[-2],img_n.shape[-1]
     img_t = get_normalized_tensor(img_n,model,device)
     image_sample = img_t.view(1,1,img_height,img_width)
     image_sample = image_sample.to(device=device, dtype=torch.float)
