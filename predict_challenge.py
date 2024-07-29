@@ -189,16 +189,28 @@ def predict_n2v(input_path:str, model_ckpt:str, batch_size: str):
         print(f"Prediction written to {tiff_out_path}")
     print(f"Done")
 
-def predict_challenge(input_path: str, model_ckpt:str, model_name: str, batch_size: int):
-    if model_name.lower() in ['n2v', 'n2v2']:
+def predict_challenge(input_path: str, model_ckpt:str, model_name: str, batch_size: int, args):
+    if model_name.lower() in ['n2v', 'n2v2', 'hdn']:
         print(f"Predicting using:")
         print(f"Input: {input_path}")
         print(f"Checkpoint: {model_ckpt}")
         print(f"Model: {model_name}")
         print(f"Batch Size: {batch_size}")
-        predict_n2v(input_path=input_path,
-                    model_ckpt=model_ckpt,
-                    batch_size=batch_size)
+        print(f"Use TTA (HDN): {args.use_tta}")
+        print(f"Patch size: {args.patch_size}")
+        print(f"Patch Batch size: {args.patch_batch_size}")
+        
+        if model_name.lower() in ['n2v', 'n2v2']:
+            predict_n2v(input_path=input_path,
+                        model_ckpt=model_ckpt,
+                        batch_size=batch_size)
+        elif model_name.lower() in ['hdn']:
+            predict_hdn(input_path=input_path,
+                        model_ckpt=model_ckpt,
+                        batch_size=batch_size,
+                        use_tta=args.use_tta,
+                        patch_size=args.patch_size,
+                        patch_batch_size=args.patch_batch_size)
     else:
         raise NotImplementedError(f"Model name {model_name} not recognized")
 
@@ -209,13 +221,17 @@ if __name__ == "__main__":
     parser.add_argument('--model_ckpt', type=str, help="Checkpoint of the model to use")
     parser.add_argument('--model_name', type=str, help="Name of the model to use, it is used to choose implementation. Can be either 'n2v', 'n2v2', 'hdn'")
     parser.add_argument('--batch_size', type=int, default=1, help="Batch size to use")
-    
+    parser.add_argument('--use_tta', action='store_true', help='Use TTA for HDN')
+    parser.add_argument('--patch_size', type=int, default=None, help="Do patchwise predictions for HDN. Requires less memory but introduces artefacts.")
+    parser.add_argument('--patch_batch_size', type=int, default=32, help="How many patches at a time to consume when patchise inference is active for HDN.")
+
     args = parser.parse_args()
 
     predict_challenge(input_path=args.input_path,
                       model_ckpt=args.model_ckpt,
                       model_name=args.model_name,
-                      batch_size=args.batch_size)
+                      batch_size=args.batch_size,
+                      args=args)
     
     
     
