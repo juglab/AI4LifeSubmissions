@@ -1,5 +1,6 @@
 from careamics import CAREamist
-from datasets import load_split_datasets, load_datasets_yml, iter_tiff_batch
+import careamics.dataset.tiling as tiling
+from careamics.prediction_utils import stitch_prediction_single
 import torch
 import tifffile
 import sys
@@ -47,55 +48,28 @@ def batch_iterator(array, batch_size):
         end_index = min(start_index + batch_size, array.shape[0])
         yield array[start_index:end_index]
 
-def save_result_image_tiff(image_array: np.ndarray, result_path: Path):
-    # Taken from Challenge inference.py
-    print(f"Writing an image to: {result_path}")
-    with tifffile.TiffWriter(result_path) as out:
-        out.write(
-            image_array,
-            resolutionunit=2
-        )
-
 def predict_hdn_patches(image: np.ndarray, model, device:str, patch_size: int=64, patch_batch_size:int =32):
     H, W = image.shape
-    patches = view_as_windows(image, (patch_size,patch_size), step=patch_size)
-    XP, YP, _, _ = patches.shape
-    patches = patches.reshape([-1, patch_size, patch_size])
-    patches = patches[:, None, ...] # predict_sample works with NCHW
-
-    # FIXME: CHECK NORMALIZATION
-    #img_mmse, samples = boilerplate.predict(patches[0], 30, models[c], None, device, use_tta)
-    output_patches = None
-
-    for p in batch_iterator(patches, batch_size=patch_batch_size):
-        o = boilerplate.predict_sample(torch.Tensor(p), model, None, device=device)
-        if output_patches is None:
-            output_patches = o
-        else:
-            output_patches = np.concatenate([output_patches, o], axis=0)
-    output_patches = output_patches.reshape([XP, YP, patch_size, patch_size])
-    out_img = np.zeros_like(image)
-
-    step = patch_size
-    for xp in range(XP):
-        for yp in range(YP):
-            x_start = xp * step
-            y_start = yp * step
-            x_end = x_start + patch_size
-            y_end = y_start + patch_size
-            out_img[x_start:x_end, y_start:y_end] = output_patches[xp, yp].squeeze()
-
-    return out_img
-    for pi, po in zip(patches, o):
-                    plt.figure()
-                    plt.subplot(1, 2, 1)
-                    plt.imshow(pi)
-                    plt.subplot(1, 2, 2)
-                    plt.imshow(po[0])
-                    plt.axis('off')
-                    plt.show()
-
-    return output_patches
+    tiles_generator = tiling.extract_tiles(arr=image[None, None, ...], tile_size=(patch_size, patch_size), overlaps=(patch_size//2 + 1, patch_size//2 + 1))
+    
+    
+    pred_patches = list()
+    patch_info = list()
+    current_batch = list()
+    while True:
+        try:
+            for b in range(patch_batch_size):
+                current_tile, current_info = next(tiles_generator)
+                patch_info.append(current_info)
+                current_batch.append(current_tile)
+        except StopIteration:
+            break
+        x = torch.Tensor(np.array(current_batch))
+        pred_patches += list(boilerplate.predict_sample(x, model, None, device=device))
+        current_batch = list()
+    print(len(pred_patches))
+    pred_patches = list(np.array(pred_patches)[:, None, ...])
+    return stitch_prediction_single(pred_patches, patch_info)
 
 def predict_hdn(input_path:str, model_ckpt:str, batch_size: str, use_tta=False, patch_size=None, patch_batch_size=32):
 
@@ -135,12 +109,8 @@ def predict_hdn(input_path:str, model_ckpt:str, batch_size: str, use_tta=False, 
         for img in tiff_input: # img has shape (C, H, W)
             out_channels = None
             for c in range(C):
-                model_mean = models[c].data_mean.cpu().numpy().squeeze()
-                model_std = models[c].data_std.cpu().numpy().squeeze()
                 img_c = img[c, ...] # img_c has shape (H, W)
                 img_c = (img_c - img_c.mean()) / img_c.std()
-                #img_c = (img_c - model_mean) / model_std
-                #img_c =  + *img_c
                 if patch_size is None:
                     out_image = boilerplate.predict_sample(torch.Tensor(img_c[None, None, ...]), models[c], None, device=device)
                 else:
@@ -148,7 +118,7 @@ def predict_hdn(input_path:str, model_ckpt:str, batch_size: str, use_tta=False, 
                 out_channels = out_image if out_channels is None else np.concatenate([out_channels, out_image], axis=1)
             print(f"Img Shape: {out_channels.shape}")
             tiff_output = out_channels if tiff_output is None else np.concatenate([tiff_output, out_channels], axis=0)
-           
+            print(f"Current TIFF Output: {tiff_output.shape}")
         tiff_output = tiff_output.squeeze()
 
         print(f"Final Prediction Shape: {out_channels.shape}")
@@ -220,7 +190,7 @@ if __name__ == "__main__":
     parser.add_argument('--model_name', type=str, help="Name of the model to use, it is used to choose implementation. Can be either 'n2v', 'n2v2', 'hdn'")
     parser.add_argument('--batch_size', type=int, default=1, help="Batch size to use")
     parser.add_argument('--use_tta', action='store_true', help='Use TTA for HDN')
-    parser.add_argument('--patch_size', type=int, default=None, help="Do patchwise predictions for HDN. Requires less memory but introduces artefacts.")
+    parser.add_argument('--patch_size', type=int, default=64, help="Do patchwise predictions for HDN. Requires less memory but introduces artefacts.")
     parser.add_argument('--patch_batch_size', type=int, default=32, help="How many patches at a time to consume when patchise inference is active for HDN.")
 
     args = parser.parse_args()
