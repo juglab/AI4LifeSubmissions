@@ -65,7 +65,11 @@ def predict_hdn_patches(image: np.ndarray, model, device:str, patch_size: int=64
         except StopIteration:
             break
         x = torch.Tensor(np.array(current_batch))
-        pred_patches += list(boilerplate.predict_sample(x, model, None, device=device))
+
+        # Average 10 samples from the model to reduce variance between the patches
+        current_patches = np.mean(np.array([boilerplate.predict_sample(x, model, None, device=device) for s in range(10)]), axis=0)
+
+        pred_patches += list(current_patches)
         current_batch = list()
     print(len(pred_patches))
     pred_patches = list(np.array(pred_patches)[:, None, ...])
